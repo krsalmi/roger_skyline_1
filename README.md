@@ -1,4 +1,4 @@
-# REMARKS ON ROGER SKYLINE 1 (NETWORK ADMINISTRATION)
+# ROGER SKYLINE 1
 
 The objective of the École42 project ‘Roger Skyline 1’ is to create a Virtual Machine and configure it to function as a web server. The requirements for the project were the following:  
 * Disk size of 8GB  
@@ -112,7 +112,7 @@ Better at this point to edit the sshd_config file again and switch Password auth
 Now if you try ssh connection with a server that doesn’t have your public key, it will give a denial.
 As stated in the subject for Roger-Skyline, root access MUST NOT be allowed with ssh connection. So open **/etc/ssh/sshd_config** again and uncomment `PermitRootLogin`, delete the ‘prohibit-password’ and write ‘no’ in its place.
   
-#### Firewall
+### Firewall
 An easy firewall to use in debian is *ufw* (uncomplicated firewall). 
 `sudo apt-get install ufw`  
 `sudo ufw enable`		(it may be disabled the same way with disable)  
@@ -164,7 +164,8 @@ I wrote the following rules before COMMIT line
 ### End HTTP ###
 ```
   
-#### Download PortSentry to detect port scans
+### PortSentry
+Download PortSentry to detect port scans.  
 Information concerning PortSentry I found at (https://www.computersecuritystudent.com/UNIX/UBUNTU/1204/lesson14/index.html)  
   
 `sudo apt-get install portsentry`  
@@ -197,7 +198,7 @@ After, we can check from our Roger VM that the attacker has indeed been blocked.
 `grep -n Blocked /var/lib/portsentry/portsentry.blocked.udp`	shows the ip’s that are blocked for udp scans  
 To unblock an address, remove the line concerning the ip from **/etc/hosts.deny**, restart portsentry and reboot the whole VM with `sudo reboot`
   
-#### Fail2ban
+### Fail2ban
 For more protection against ddos attacks, download fail2ban `sudo apt-get install fail2ban`  
 To further configure fail2ban, copy the original jail.conf file into .local and modify it, don’t modify jail.conf directly.  
 `sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local`  
