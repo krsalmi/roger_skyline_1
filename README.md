@@ -212,111 +212,113 @@ Maxentry = 300
 Findtime = 300
 Bantime = 600
 Action = iptables[name=HTTP, port=http, protocol=tcp]
-````
+```
 `sudo service fail2ban restart`  
 If you want to for ex ban someones ssh access manually, run
-sudo fail2ban-client set ssh banip 10.11.32.32`  
+`sudo fail2ban-client set ssh banip 10.11.32.32`  
 Then, if you check `sudo iptables -L`, the banned ip address will be listed in regards to ssh access.  
   
-Add http-get-dos configurations to fail2ban
-First, test without configuration. Download slowloris on your Mac, go to the folder to which you saved it (for me, it was home/Library/Python/3.9/lib/python/site-packages)and try attacking your VM with
-python3 slowloris.py 10.11.16.16
+#### Add http-get-dos configurations to fail2ban
+First, test without configuration. Download slowloris on your Mac, go to the folder to which you saved it (for me, it was home/Library/Python/3.9/lib/python/site-packages) and try attacking your VM with
+`python3 slowloris.py 10.11.16.16`
 This will start sending headers to your ip address, socket count will start at 19.
 To protect your ip from these ddos attacks, create new file
-sudo vim /etc/fail2ban/filter.d/http-get-dos.conf
+`sudo vim /etc/fail2ban/filter.d/http-get-dos.conf`
 And add
+```
 [Definition]
 failregex = ^<HOST> -.*"(GET|POST).*
 ignoreregex =
-After saving, restart fail2ban
+```
+After saving, restart fail2ban  
 Perform another attack from your Mac and see how this time socket count has dropped to 0.
-Check your fail2ban jail situation: sudo fail2ban-client status should show that you have 2 jails listed (sshd and http-get-dos). To further examine the http-get-dos jail, run sudo fail2ban-client status http-get-dos
-You should see the ip address of your Mac in the banned ip list.
-To unban an address, run sudo fail2ban-client unban --all
-Stopping unnecessary services
+Check your fail2ban jail situation: `sudo fail2ban-client status` should show that you have 2 jails listed (sshd and http-get-dos). To further examine the http-get-dos jail, run `sudo fail2ban-client status http-get-dos`  
+You should see the ip address of your Mac in the banned ip list.  
+To unban an address, run `sudo fail2ban-client unban --all`  
+  
+### Stopping unnecessary services
 There’s many ways to list active services, but for my liking the most straightforward is to run
-sudo systemctl list-unit-files --state=enabled
-Or sudo service --status-all
-Basically all services that were listed with the second command are important!
-Apache2 -- webserver
-Apparmor -- Mandatory Access Control framework
-Cron -- takes care of scheduled tasks
-Dbus -- network time synchronization
-Exim4 -- mail services
-Fail2ban -- one of the firewall services (ddos attacks)
-Kmod -- control kernel modules (insert, remove, load)
-Networking -- network connection, static ip
-Portsentry -- protects against port scans
-Procps -- process commands (kill, top, ps)
-Rsyslog -- takes care of logging
-Ssh -- secure shell (access from outside world etc w keys)
-Udev -- device file system (launch config files etc)
-Ufw -- firewall, used to open/close ports and to designate them
-SCRIPTS
-Writing automation scripts
-To automate certain system updates, I created a new directory called “scripts” in my home directory and wrote bash scripts in it.
+`sudo systemctl list-unit-files --state=enabled`
+Or `sudo service --status-all`  
+Basically, all services that were listed with the second command are important!  
+* Apache2 -- webserver
+* Apparmor -- Mandatory Access Control framework
+* Cron -- takes care of scheduled tasks
+* Dbus -- network time synchronization
+* Exim4 -- mail services
+* Fail2ban -- one of the firewall services (ddos attacks)
+* Kmod -- control kernel modules (insert, remove, load)
+* Networking -- network connection, static ip
+* Portsentry -- protects against port scans
+* Procps -- process commands (kill, top, ps)
+* Rsyslog -- takes care of logging
+* Ssh -- secure shell (access from outside world etc w keys)
+* Udev -- device file system (launch config files etc)
+* Ufw -- firewall, used to open/close ports and to designate them
+  
+## SCRIPTS
+To automate certain system updates, I created a new directory called “scripts” in my home directory and wrote bash scripts in it.  
+  
+#### Script to update and upgrade packages
+```
 #!/bin/bash
 date >> /var/log/update_script.log
 sudo apt-get update >> /var/log/update_script.log
 sudo apt-get upgrade -y >> /var/log/update_script.log
-
+```
 This updates the package sources and upgrades the packages. It also logs the output of both commands into the designated file.
-
 To automate this script to run at 4AM every week on Wednesday, I opened crontab with
-crontab -e
+`crontab -e` 
 and wrote under the commented section 
-
+```
 0 4 * * 3 sudo bash ~/scripts/update_and_log_packages.sh
 @reboot sudo bash ~/scripts/update_and_log_packages.sh
-
-This will schedule the script to run at 4AM on Wednesdays and also on system reboot.
-
-If the cron has a problem running the script, mail will be sent to the user in whose script is in question. If the problem is ‘tty access’, you can modify the file /etc/sudoers and add a line
-user_name ALL=(ALL) NOPASSWD:ALL
+```
+This will schedule the script to run at 4AM on Wednesdays and also on system reboot.  
+  
+If cron has a problem running the script, mail will be sent to the user whose script is in question. If the problem is ‘tty access’, you can modify the file **/etc/sudoers** and add a line 
+`user_name ALL=(ALL) NOPASSWD:ALL`  
 This way, cron doesn’t need a password to run sudo commands or to modify certain files.
-
-Script to monitor changes in /etc/crontab and to send email to root
-
+  
+#### Script to monitor changes in /etc/crontab and to send email to root
 Save the current state of your crontab with cat /etc/crontab > cron_orig.txt
 Create a new bash file called cron_changes.sh and add in it:
-
+```
 #!/bin/bash
-sudo cat /etc/crontab > cron_current.txt
-if [[ $(diff cron_current.txt cron_orig.txt) ]]; then
-	mail -s “Changes in crontab” root@localhost <<< ‘Changes have occurred in crontab. After checking the changes, remember to save the current state of crontab as cron_orig.txt’
+if [[ $(diff /etc/crontab cron_orig.txt) ]]; then
+	mail -s “Changes in crontab” root@localhost <<< ‘$(diff /etc/crontab cron_orig.txt)’
+	cat /etc/crontab > cron_orig.txt
 fi
+```
+This will compare the current state of the crontab file with the original one with diff. If there is a difference, an email will be sent to root. The email can be checked as a root or with sudo from **/var/mail/** 	The file your email will be found at, will be that with the name of your original user that your made when you created the VM. This is a security feature of debian; mail addressed to root will be found with the original user.
+  
+To schedule the script to run at midnight, run `crontab -e and` add
+`0 0 * * * sudo bash /home/roger_user/scripts/cron_changes.sh`  
 
-This will save the newest state of the crontab to cron_current.txt and compare the two files with diff. Is there is a difference, an email will be sent to root. The email can be checked as a root or with sudo from /var/mail/ 	The file your email will be found at, will be that with the name of your original user that your made when you created the VM. This is a security feature of debian; mail addressed to root will be found from the original user.
-
-To schedule the script to run at midnight, run crontab -e and add
-0 0 * * * sudo bash /home/roger_user/scripts/cron_changes.sh
-
-
-Website portion
+## Website part
 
 Download apache if you haven’t already with
-sudo apt-get install apache2
+`sudo apt-get install apache2`
+  
+### SSL 
+(mostly from https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-apache-in-debian-10)  
 
+`sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt`
 
-
-SSL 
-(mostly from https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-apache-in-debian-10)
-
-Create a Self-Signed TLS certificate as root in a file called certs
-
-sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt
-
-This will create a 2048 bit rsa key, will be valid for a year and the nodes means that it will not require a passphrase.
+This will create a 2048 bit rsa key, will be valid for a year. 'Nodes' means that it will not require a passphrase.  
 
 Next you will be asked to fill in information for your certificate. The most important fields are
+``
 Common Name (e.g. server FQDN or YOUR name) []:server_IP_address
 Email Address []:admin@your_domain.com
+``
 Here, you should write down your server ip address and email for ex. in the form of root@domain.hostname (however you have yours)
-
-Configuring apache to use SSL
+  
+#### Configuring apache to use SSL
 Open a new file which will include a configuration snippet
-sudo vim /etc/apache2/conf-available/ssl-params.conf
+`sudo vim /etc/apache2/conf-available/ssl-params.conf`  
 And paste this in it:
+```
 SSLCipherSuite EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH
 SSLProtocol All -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
 SSLHonorCipherOrder On
@@ -331,16 +333,17 @@ SSLUseStapling on
 SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
 # Requires Apache >= 2.4.11
 SSLSessionTickets Off
-Next, we must modify the default Apache SSL Virtual Host File
+```
+Next, we must modify the default Apache SSL Virtual Host File  
 Copy the original into
-sudo cp /etc/apache2/sites-available/default-ssl.conf /etc/apache2/sites-available/default-ssl.conf.bak
-
-Open the original and change the lines relating to your ServerAdmin email, the name of the ssl certificate anc the name of the private key to what you chose earlier. You must also add a line after the ServerAdmin, stating your ServerName as your ip address.
+`sudo cp /etc/apache2/sites-available/default-ssl.conf /etc/apache2/sites-available/default-ssl.conf.bak`
+  
+Open the original and change the lines relating to your ServerAdmin email, the name of the ssl certificate anc the name of the private key to what you chose earlier. You must also add a line after the ServerAdmin, stating your ServerName as your ip address.  
 
 Open the file 
-sudo vim /etc/apache2/sites-available/000-default.conf
-And add a line somewhere between the VirtualHost *:80 opening and closing brackets to redirect all traffic to https
-
+**sudo vim /etc/apache2/sites-available/000-default.conf** 
+and add a line somewhere between the VirtualHost *:80 opening and closing brackets to redirect all traffic to https
+```
 <VirtualHost *:80>
         . . .
 
@@ -348,37 +351,39 @@ And add a line somewhere between the VirtualHost *:80 opening and closing bracke
 
         . . .
 </VirtualHost>
+```
+  
+#### Enabling changes in Apache
+Type the following commands to make sure ssl and headers are enabled  
+`sudo a2enmod ssl`  
+`sudo a2enmod headers`  
+`sudo a2ensite default-ssl`  
+`sudo a2enconf ssl-params`  
+  
+Next, check that the configurations don’t have syntax errors:  
+`sudo apache2ctl configtest`  
+If this outputs “Syntax OK”, we can restart apache  
+`sudo systemctl restart apache2`  
 
-Enabling changes in Apache
-Type the following commands to make sure ssl and headers are enabled
-sudo a2enmod ssl
-sudo a2enmod headers
-sudo a2ensite default-ssl
-sudo a2enconf ssl-params
-
-Next, check that the configurations don’t have syntax errors:
-sudo apache2ctl configtest
-If this outputs “Syntax OK”, we can restart apache
-sudo systemctl restart apache2
-
-Displaying your website
+### Displaying your website
 Already now, that the apache is up and running, going to your ip address with a browser will display the default Apache index.html file with some information. To display your own website, go to
-cd /var/www/html	remove the default index.html (or name it something else) and save all your website files and subfolders in this /var/www/html folder. (Your own index.html must be at the root)
-Restart Apache and check the browser for your new website!
+`cd /var/www/html`	remove the default index.html (or name it something else) and save all your website files and subfolders in this **/var/www/html** folder. (Your own index.html must be at the root)  
+Restart Apache and check the browser for your new website!  
 
-Script to automate website deployment
+### Script to automate website deployment
 Say I work on my website files outside of the VM in Visual studio code for example. To deploy the changes, I could always download my git repository in my virtual machine, but I find this too much work, because I would have to download the git commands etc in my VM.
-So, I have decided to use ssh connection to copy my website files to a folder website_updates which can be found in the home folder of my VM user. From there the files will be copied into the /var/www/html folder if changes are found. Do not try to copy the files directly with ssh to this folder, because root access has been denied and the /var/ folder does not belong to your user.
-So from my Mac, from the folder with my website files:
-scp -r -P 51111 * roger_user@10.11.16.16:~/website_updates
+So, I have decided to use ssh connection to copy my website files to a folder website_updates which can be found in the home folder of my VM user. From there the files will be copied into the **/var/www/html** folder if changes are found. Do not try to copy the files directly with ssh to this folder, because root access has been denied and the /var/ folder does not belong to your user.
+So from my Mac, from the folder with my website files:  
+`scp -r -P 51111 * roger_user@10.11.16.16:~/website_updates`  
 
-My script to check for changes and deploy the website is as follows:
+My script to check for changes and deploy the website is as follows:  
+```
 #!/bin/bash
 if [[ $(diff -rq /home/roger_user/website_updates  /var/www/html) != “”]]; then
 	sudo cp -r /home/roger_user/website_updates/* /var/www/html/
 fi
-
-I have scheduled this check to happen automatically at midnight (from the crontab)
-0 0 * * * sudo bash /home/roger_user/scripts/deploy_update_website.sh
-
-If the website has many images and loading them on the webpage is very slow, your partitioning might need 1GB of swap room. This also can be added with sudo cfdisk
+```
+I have scheduled this check to happen automatically at midnight (from the crontab)  
+`0 0 * * * sudo bash /home/roger_user/scripts/deploy_update_website.sh`
+  
+If the website has many images and loading them on the webpage is very slow, your partitioning might need more swap space. This also can be added with `sudo cfdisk`  
