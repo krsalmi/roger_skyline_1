@@ -264,6 +264,7 @@ To automate certain system updates, I created a new directory called “scripts�
 #### Script to update and upgrade packages
 ```
 #!/bin/bash
+echo "---------------------------" >> /var/log/update_script.log
 date >> /var/log/update_script.log
 sudo apt-get update >> /var/log/update_script.log
 sudo apt-get upgrade -y >> /var/log/update_script.log
@@ -287,9 +288,9 @@ Save the current state of your crontab with cat /etc/crontab > cron_orig.txt
 Create a new bash file called cron_changes.sh and add in it:
 ```
 #!/bin/bash
-if [[ $(diff /etc/crontab cron_orig.txt) ]]; then
-	mail -s “Changes in crontab” root@localhost <<< ‘$(diff /etc/crontab cron_orig.txt)’
-	cat /etc/crontab > cron_orig.txt
+if [[ $(diff /etc/crontab /home/roger_user/scripts/cron_orig.txt) ]]; then
+	mail -s “Changes in crontab” root@localhost <<< $(diff /etc/crontab cron_orig.txt)
+	sudo cat /etc/crontab > /home/roger_user/scripts/cron_orig.txt
 fi
 ```
 This will compare the current state of the crontab file with the original one with diff. If there is a difference, an email will be sent to root. The email can be checked as a root or with sudo from **/var/mail/** 	The file your email will be found at, will be that with the name of your original user that your made when you created the VM. This is a security feature of debian; mail addressed to root will be found with the original user.
